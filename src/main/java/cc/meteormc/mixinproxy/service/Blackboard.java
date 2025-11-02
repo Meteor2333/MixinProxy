@@ -21,13 +21,13 @@ public class Blackboard implements IGlobalPropertyService {
 
     @Override
     public void setProperty(IPropertyKey key, Object value) {
-        BLACKBOARD.put(key.toString(), value);
+        Blackboard.BLACKBOARD.put(key.toString(), value);
     }
 
     @Override
     public <T> T getProperty(IPropertyKey key, T defaultValue) {
         //noinspection unchecked
-        return (T) BLACKBOARD.getOrDefault(key.toString(), defaultValue);
+        return (T) Blackboard.BLACKBOARD.getOrDefault(key.toString(), defaultValue);
     }
 
     @Override

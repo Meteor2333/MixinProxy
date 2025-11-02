@@ -1,28 +1,31 @@
 package cc.meteormc.mixinproxy.service;
 
-import cc.meteormc.mixinproxy.Bootstrap;
+import cc.meteormc.mixinproxy.MixinProxy;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
+import org.spongepowered.asm.launch.platform.MixinPlatformAgentDefault;
 import org.spongepowered.asm.launch.platform.container.ContainerHandleURI;
 import org.spongepowered.asm.launch.platform.container.ContainerHandleVirtual;
 import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.logging.ILogger;
 import org.spongepowered.asm.logging.LoggerAdapterConsole;
-import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
+import org.spongepowered.asm.logging.LoggerAdapterDefault;
 import org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory;
 import org.spongepowered.asm.service.*;
 import org.spongepowered.asm.transformers.MixinClassReader;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class MixinService extends MixinServiceAbstract implements IClassProvider, IClassBytecodeProvider, IClassTracker {
-    public static final AtomicReference<IMixinTransformer> TRANSFORMER = new AtomicReference<>();
+public class MixinService extends MixinServiceAbstract implements IClassProvider, IClassBytecodeProvider {
+    public static final Map<String, byte[]> TEMP_RESOURCES = new ConcurrentHashMap<>();
 
     @Override
     public String getName() {
@@ -38,7 +41,7 @@ public class MixinService extends MixinServiceAbstract implements IClassProvider
     public void offer(IMixinInternal internal) {
         super.offer(internal);
         if (internal instanceof IMixinTransformerFactory) {
-            TRANSFORMER.set(((IMixinTransformerFactory) internal).createTransformer());
+            MixinProxy.CLASSLOADER.offerTransformer(((IMixinTransformerFactory) internal).createTransformer());
         }
     }
 
@@ -59,7 +62,7 @@ public class MixinService extends MixinServiceAbstract implements IClassProvider
 
     @Override
     public IClassTracker getClassTracker() {
-        return this;
+        return null;
     }
 
     @Override
@@ -69,7 +72,7 @@ public class MixinService extends MixinServiceAbstract implements IClassProvider
 
     @Override
     public Collection<String> getPlatformAgents() {
-        return Arrays.asList("org.spongepowered.asm.launch.platform.MixinPlatformAgentDefault");
+        return Arrays.asList(MixinPlatformAgentDefault.class.getName());
     }
 
     @Override
@@ -88,12 +91,18 @@ public class MixinService extends MixinServiceAbstract implements IClassProvider
 
     @Override
     public InputStream getResourceAsStream(String name) {
-        return Bootstrap.CLASSLOADER.getResourceAsStream(name);
+        // Try to get temporary resources
+        byte[] tempResource = MixinService.TEMP_RESOURCES.get(name);
+        if (tempResource != null) {
+            return new ByteArrayInputStream(tempResource);
+        }
+
+        return MixinProxy.CLASSLOADER.getResourceAsStream(name);
     }
 
     @Override
     protected ILogger createLogger(String name) {
-        return new LoggerAdapterConsole(name);
+        return MixinProxy.DEBUG ? new LoggerAdapterConsole(name) : new LoggerAdapterDefault(name);
     }
 
     @Override
@@ -103,17 +112,17 @@ public class MixinService extends MixinServiceAbstract implements IClassProvider
 
     @Override
     public Class<?> findClass(String name) throws ClassNotFoundException {
-        return Bootstrap.CLASSLOADER.loadClass(name);
+        return MixinProxy.CLASSLOADER.loadClass(name);
     }
 
     @Override
     public Class<?> findClass(String name, boolean initialize) throws ClassNotFoundException {
-        return Class.forName(name, initialize, Bootstrap.CLASSLOADER);
+        return Class.forName(name, initialize, MixinProxy.CLASSLOADER);
     }
 
     @Override
     public Class<?> findAgentClass(String name, boolean initialize) throws ClassNotFoundException {
-        return Class.forName(name, initialize, Bootstrap.class.getClassLoader());
+        return Class.forName(name, initialize, ClassLoader.getSystemClassLoader());
     }
 
     @Override
@@ -128,25 +137,10 @@ public class MixinService extends MixinServiceAbstract implements IClassProvider
 
     @Override
     public ClassNode getClassNode(String name, boolean runTransformers, int readerFlags) throws ClassNotFoundException, IOException {
-        byte[] bytes = Bootstrap.CLASSLOADER.getClassBytes(name, runTransformers);
+        byte[] bytes = MixinProxy.CLASSLOADER.getClassBytes(name, runTransformers);
         ClassReader classReader = new MixinClassReader(bytes, name);
         ClassNode node = new ClassNode();
         classReader.accept(node, readerFlags);
         return node;
-    }
-
-    @Override
-    public void registerInvalidClass(String className) {
-
-    }
-
-    @Override
-    public boolean isClassLoaded(String className) {
-        return Bootstrap.CLASSLOADER.findLoadedClassFwd(className) != null;
-    }
-
-    @Override
-    public String getClassRestrictions(String className) {
-        return "";
     }
 }
