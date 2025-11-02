@@ -28,10 +28,7 @@ public class ProxyClassLoader extends URLClassLoader {
 
     private static final Logger LOGGER = Logger.getLogger(ProxyClassLoader.class.getName());
     private static final List<String> ALLOWED_CLASSES = Arrays.asList(
-            "com.mojang.",
-            "net.minecraft.",
-            "org.bukkit.",
-            "org.spigotmc."
+            "cc.meteormc.project."   // Provide the package(s) of the Mixin target classes here
     );
 
     public ProxyClassLoader(ClassLoader parent) {

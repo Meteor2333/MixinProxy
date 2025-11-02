@@ -1,0 +1,10 @@
+{
+  "required": true,
+  "package": "cc.meteormc.project.mixin",
+  "mixins": [
+    "ExampleMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
